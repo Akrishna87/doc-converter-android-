@@ -3,6 +3,11 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to create
+        default: v1.0.0
 
 permissions:
   contents: write
@@ -32,7 +37,8 @@ jobs:
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          cp app/build/outputs/apk/release/app-release.apk "DocConverter-${GITHUB_REF_NAME}.apk"
-          gh release create "$GITHUB_REF_NAME" "DocConverter-${GITHUB_REF_NAME}.apk" \
-            --title "Doc Converter ${GITHUB_REF_NAME}" --generate-notes
+          cp app/build/outputs/apk/release/app-release.apk "DocConverter-${TAG}.apk"
+          gh release create "$TAG" "DocConverter-${TAG}.apk" --target "$GITHUB_SHA" \
+            --title "Doc Converter ${TAG}" --generate-notes
