@@ -32,3 +32,11 @@ fun parseMarkdown(md: String): List<MdLine> {
 }
 
 fun markdownToPlainText(md: String): String = parseMarkdown(md).joinToString("\n") { it.text }
+
+fun linesToMarkdown(lines: List<MdLine>): String = lines.joinToString("\n") { l ->
+    when {
+        l.level > 0 -> "#".repeat(l.level.coerceAtMost(6)) + " " + l.text
+        l.text.trimStart().startsWith("• ") -> l.text.replaceFirst("• ", "- ")
+        else -> l.text
+    }
+}

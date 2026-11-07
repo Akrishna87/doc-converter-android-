@@ -12,42 +12,66 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
-    var source by mutableStateOf<Uri?>(null); private set
-    var name by mutableStateOf(""); private set
-    var srcFmt by mutableStateOf<Fmt?>(null); private set
+    var sources by mutableStateOf<List<Src>>(emptyList()); private set
     var target by mutableStateOf<Fmt?>(null); private set
+    var options by mutableStateOf(Options()); private set
     var busy by mutableStateOf(false); private set
+    var progress by mutableStateOf(""); private set
     var results by mutableStateOf<List<Output>>(emptyList()); private set
     var error by mutableStateOf<String?>(null); private set
 
-    fun pick(uri: Uri) {
+    val targets: List<Fmt> get() = commonTargets(sources.map { it.fmt })
+    val allPdf: Boolean get() = sources.isNotEmpty() && sources.all { it.fmt == Fmt.PDF }
+    val anyTextLike: Boolean get() = sources.any { it.fmt.isTextLike }
+    val anyPdf: Boolean get() = sources.any { it.fmt == Fmt.PDF }
+
+    /** Add files to the batch ([append] = true) or start a new batch. */
+    fun setFiles(uris: List<Uri>, append: Boolean) {
         val cr = getApplication<Application>().contentResolver
-        val n = Converter.displayName(cr, uri)
-        val fmt = detectFormat(cr.getType(uri), n)
-        source = uri
-        name = n
-        srcFmt = fmt
-        target = fmt?.let { targetsFor(it).firstOrNull() }
+        val list = if (append) sources.toMutableList() else mutableListOf()
+        val skipped = mutableListOf<String>()
+        for (uri in uris) {
+            if (list.any { it.uri == uri }) continue
+            val name = Converter.displayName(cr, uri)
+            val fmt = detectFormat(cr.getType(uri), name)
+            if (fmt == null) skipped += name else list += Src(uri, name, fmt)
+        }
+        sources = list
         results = emptyList()
-        error = if (fmt == null) "Unsupported file type" else null
+        error = if (skipped.isEmpty()) null else "Unsupported file type: ${skipped.joinToString()}"
+        if (target !in targets) target = targets.firstOrNull()
+    }
+
+    fun remove(src: Src) {
+        sources = sources - src
+        results = emptyList()
+        if (target !in targets) target = targets.firstOrNull()
+    }
+
+    fun clear() {
+        sources = emptyList(); target = null; results = emptyList(); error = null
     }
 
     fun selectTarget(f: Fmt) { target = f }
 
+    fun update(f: (Options) -> Options) { options = f(options) }
+
     fun convert() {
-        val uri = source ?: return
-        val from = srcFmt ?: return
         val to = target ?: return
+        val srcs = sources
+        if (srcs.isEmpty()) return
         busy = true
         error = null
         results = emptyList()
         viewModelScope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    Converter.convert(getApplication(), uri, from, to, name)
+            val r = withContext(Dispatchers.IO) {
+                Converter.run(getApplication(), srcs, to, options) { i, n ->
+                    progress = if (n > 1) "Converting ${i + 1} of $n…" else "Converting…"
                 }
-            }.onSuccess { results = it }
-                .onFailure { error = it.message ?: "Conversion failed" }
+            }
+            results = r.outputs
+            error = r.errors.takeIf { it.isNotEmpty() }?.joinToString("\n")
+            progress = ""
             busy = false
         }
     }

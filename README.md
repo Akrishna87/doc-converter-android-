@@ -2,16 +2,22 @@
 
 A native Android app (Kotlin + Jetpack Compose) that converts documents between formats **entirely on-device**. No uploads, no network permission.
 
-## Supported conversions (v0.1)
+## Features (v0.2)
 
 | From | To |
 |------|----|
 | JPG / PNG / WEBP | the other image formats, PDF |
-| PDF | PNG, JPG, WEBP (one image per page) |
-| Text (.txt) | PDF, Markdown |
-| Markdown (.md) | PDF (headings and lists rendered), Text |
+| PDF | PNG / JPG / WEBP (one per page), TXT, Markdown, DOCX (text extraction), PDF (extract pages or split) |
+| Word (.docx) | PDF, TXT, Markdown (headings, bullets) |
+| Text (.txt) | PDF, Markdown, DOCX |
+| Markdown (.md) | PDF (headings and lists rendered), TXT, DOCX |
 
-Results are saved to `Downloads/DocConverter` and can be opened or shared. Files can also be sent to the app from the share sheet.
+- **Batch:** pick many files at once and convert them all; failures are reported per file.
+- **Combine:** merge images, PDFs, Word, text or Markdown files into a single PDF.
+- **PDF pages:** keep a range such as `1-3,5,8-` or split into one file per page (real PDF pages, not rasterised).
+- **Settings:** JPG/WEBP quality, PDF render resolution, A4/Letter page size, font size.
+- Results are saved to `Downloads/DocConverter`; open or share them. Files can also be sent in from the share sheet.
+- Scanned (image-only) PDFs have no text to extract, so PDF to TXT/MD/DOCX reports an error for them. OCR is not included.
 
 ## Build
 
@@ -25,6 +31,6 @@ The APK lands in `app/build/outputs/apk/debug/`. GitHub Actions builds it on eve
 
 ## Roadmap
 
-- DOCX to PDF/text, and text to DOCX
-- Merge/split PDFs, page range selection
-- Batch conversion, quality settings
+- OCR for scanned PDFs
+- Password-protected PDFs
+- Rich formatting (tables, images) in DOCX conversion

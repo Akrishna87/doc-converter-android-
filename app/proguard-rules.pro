@@ -1,1 +1,5 @@
-# Default rules are enough for this app
+-keep class com.tom_roush.** { *; }
+-dontwarn com.gemalto.jp2.**
+-dontwarn org.bouncycastle.**
+-dontwarn javax.xml.**
+-dontwarn org.w3c.dom.**
