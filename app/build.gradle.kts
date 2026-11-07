@@ -11,14 +11,29 @@ android {
         applicationId = "com.akrishna.docconverter"
         minSdk = 29
         targetSdk = 34
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "1.0.0"
     }
 
+    // Release signing comes from the environment (e.g. GitHub secrets); no key is stored in the repo.
+    // Without it the release build falls back to the debug signature, which installs fine but
+    // cannot update an APK signed by a different machine's debug key.
+    val releaseKey = System.getenv("KEYSTORE_FILE")
+    if (releaseKey != null) {
+        signingConfigs {
+            create("release") {
+                storeFile = file(releaseKey)
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
     buildTypes {
         release {
-            isMinifyEnabled = true
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName(if (releaseKey != null) "release" else "debug")
+            // R8 is off: shrinking PdfBox without device testing risks runtime crashes.
+            isMinifyEnabled = false
         }
     }
     compileOptions {

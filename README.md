@@ -2,7 +2,13 @@
 
 A native Android app (Kotlin + Jetpack Compose) that converts documents between formats **entirely on-device**. No uploads, no network permission.
 
-## Features (v0.2)
+## Install
+
+1. Open the [latest release](../../releases/latest) on your phone and download `DocConverter-*.apk`.
+2. Open it and allow "Install unknown apps" for your browser when asked.
+3. Launch **Doc Converter**. Needs Android 10 or newer.
+
+## Features
 
 | From | To |
 |------|----|
@@ -21,10 +27,12 @@ A native Android app (Kotlin + Jetpack Compose) that converts documents between 
 
 ## Build
 
+Release signing reads `KEYSTORE_FILE`, `KEYSTORE_PASSWORD`, `KEY_ALIAS` and `KEY_PASSWORD` from the environment. The release workflow fills these from the GitHub secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS` and `KEY_PASSWORD`. Without them the APK is signed with the debug key, which still installs.
+
 Requires JDK 17 and the Android SDK (API 34).
 
 ```
-./gradlew testDebugUnitTest assembleDebug
+./gradlew testDebugUnitTest assembleDebug assembleRelease
 ```
 
 The APK lands in `app/build/outputs/apk/debug/`. GitHub Actions builds it on every push (see the `Build` workflow artifacts).
