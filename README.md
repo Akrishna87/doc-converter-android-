@@ -1,12 +1,12 @@
-# Doc Converter (Android)
+# DocMorph (Android)
 
 A native Android app (Kotlin + Jetpack Compose) that converts documents between formats **entirely on-device**. No uploads, no network permission.
 
 ## Install
 
-1. Open the [latest release](../../releases/latest) on your phone and download `DocConverter-*.apk`.
+1. Open the [latest release](../../releases/latest) on your phone and download `DocMorph-*.apk`.
 2. Open it and allow "Install unknown apps" for your browser when asked.
-3. Launch **Doc Converter**. Needs Android 10 or newer.
+3. Launch **DocMorph**. Needs Android 10 or newer.
 
 ## Features
 

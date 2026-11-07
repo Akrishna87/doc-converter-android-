@@ -3,8 +3,13 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path android:fillColor="#FFFFFF" android:pathData="M30,32h22l10,10v34h-32z" />
-    <path android:fillColor="#C5CAE9" android:pathData="M52,32l10,10h-10z" />
-    <path android:fillColor="#3F51B5" android:pathData="M36,52h20v3h-20zM36,59h20v3h-20zM36,66h14v3h-14z" />
-    <path android:fillColor="#FFC107" android:pathData="M64,52h10v-6l12,10l-12,10v-6h-10z" />
+    <group android:translateX="1.5">
+        <!-- the document -->
+        <path android:fillColor="#FFFFFF" android:pathData="M32,30h22v48h-22z" />
+        <path android:fillColor="#5B2EFF" android:pathData="M36,38h14v3h-14zM36,45h14v3h-14zM36,52h14v3h-14zM36,59h9v3h-9z" />
+        <!-- ...morphing: square, diamond, circle -->
+        <path android:fillColor="#4DD0E1" android:pathData="M58,32h14v14h-14z" />
+        <path android:fillColor="#FFCA28" android:pathData="M65,48l8,8l-8,8l-8,-8z" />
+        <path android:fillColor="#FF6E9C" android:pathData="M58,72a7,7 0 1,0 14,0a7,7 0 1,0 -14,0z" />
+    </group>
 </vector>

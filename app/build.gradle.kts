@@ -8,11 +8,11 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.akrishna.docconverter"
+        applicationId = "com.akrishna.docmorph"
         minSdk = 29
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.0.0"
+        versionCode = 4
+        versionName = "1.1.0"
     }
 
     // Release signing comes from the environment (e.g. GitHub secrets); no key is stored in the repo.

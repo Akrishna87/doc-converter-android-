@@ -7,7 +7,7 @@ on:
     inputs:
       tag:
         description: Release tag to create
-        default: v1.0.0
+        default: v1.1.0
 
 permissions:
   contents: write
@@ -39,6 +39,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          cp app/build/outputs/apk/release/app-release.apk "DocConverter-${TAG}.apk"
-          gh release create "$TAG" "DocConverter-${TAG}.apk" --target "$GITHUB_SHA" \
-            --title "Doc Converter ${TAG}" --generate-notes
+          cp app/build/outputs/apk/release/app-release.apk "DocMorph-${TAG}.apk"
+          gh release create "$TAG" "DocMorph-${TAG}.apk" --target "$GITHUB_SHA" \
+            --title "DocMorph ${TAG}" --generate-notes

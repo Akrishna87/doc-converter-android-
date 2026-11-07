@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "DocConverter"
+rootProject.name = "DocMorph"
 include(":app")

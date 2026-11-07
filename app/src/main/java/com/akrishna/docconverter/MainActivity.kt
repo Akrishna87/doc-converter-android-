@@ -99,7 +99,7 @@ private fun Screen(vm: MainViewModel) {
             Modifier.padding(pad).padding(20.dp).fillMaxSize().verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text("Doc Converter", style = MaterialTheme.typography.headlineMedium)
+            Text("DocMorph", style = MaterialTheme.typography.headlineMedium)
             Text(
                 "Convert images, PDF, Word, text and Markdown on your device. Nothing is uploaded.",
                 style = MaterialTheme.typography.bodyMedium,
