@@ -91,9 +91,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     busy = false
                 },
             ) {
-                val r = withContext(Dispatchers.IO) {
-                    Converter.run(app, srcs, inputs.target, inputs.options) { i, n ->
+                val r = withJobProgress(
+                    onProgress = { i, n ->
                         progress = if (n > 1) "Converting ${i + 1} of $n…" else "Converting…"
+                    },
+                ) { report ->
+                    withContext(Dispatchers.IO) {
+                        Converter.run(app, srcs, inputs.target, inputs.options, report)
                     }
                 }
                 results = r.outputs
