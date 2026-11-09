@@ -11,9 +11,9 @@ on:
         type: boolean
         default: false
       version_code:
-        description: Version code for signed test APK (use 5 then 6 for update test)
+        description: Version code (minimum 7; increase for subsequent updates)
         type: string
-        default: '5'
+        default: '7'
 
 permissions:
   contents: read
@@ -42,7 +42,7 @@ jobs:
   signed-test:
     if: >-
       github.event_name == 'workflow_dispatch' && inputs.signed &&
-      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/dm-031-stable-signing')
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/dm-031-version-code')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

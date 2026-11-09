@@ -10,8 +10,8 @@ android {
         applicationId = "com.akrishna.docmorph"
         minSdk = 29
         targetSdk = 34
-        versionCode = providers.gradleProperty("docmorphVersionCode").orElse("5").get().toInt().also {
-            require(it in 5..2100000000) { "Invalid DocMorph version code" }
+        versionCode = providers.gradleProperty("docmorphVersionCode").orElse("7").get().toInt().also {
+            require(it in 7..2100000000) { "Invalid DocMorph version code: must be at least 7" }
         }
         versionName = "1.1.1"
     }
