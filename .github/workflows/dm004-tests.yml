@@ -1,0 +1,67 @@
+name: DM-004 test evidence
+
+on:
+  pull_request:
+    paths:
+      - 'app/**'
+      - '.github/workflows/dm004-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lifecycle-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Run unit tests from clean outputs
+        run: ./gradlew clean testDebugUnitTest
+      - name: Verify all nine DM-004 tests executed without skips
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          expected = {'JobExecutionTest': 6, 'JobCancellationTest': 3}
+          lines = ['## DM-004 test execution', '', 'Commit: `' + os.environ['GITHUB_SHA'] + '`', '']
+          failures = []
+          for name, count in expected.items():
+              path = Path('app/build/test-results/testDebugUnitTest/TEST-com.akrishna.docconverter.' + name + '.xml')
+              if not path.exists():
+                  failures.append(name + ': missing XML report')
+                  continue
+              suite = ET.parse(path).getroot()
+              cases = suite.findall('testcase')
+              bad = [c.attrib.get('name', '?') for c in cases if any(c.find(tag) is not None for tag in ('failure', 'error', 'skipped'))]
+              lines.append('- ' + name + ': ' + str(len(cases)) + '/' + str(count) + ' executed; ' + str(len(bad)) + ' failed/error/skipped')
+              if len(cases) != count or bad:
+                  failures.append(name + ': wrong count or unsuccessful cases: ' + ', '.join(bad))
+          lines.extend([''] + failures)
+          text = '\n'.join(lines) + '\n'
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write(text)
+          print(text)
+          if failures:
+              raise SystemExit(1)
+          PY
+      - name: Preserve XML results and HTML reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DM-004-test-reports
+          path: |
+            app/build/test-results/testDebugUnitTest/
+            app/build/reports/tests/testDebugUnitTest/
+          if-no-files-found: error
+          retention-days: 14
