@@ -22,6 +22,9 @@ import android.text.TextPaint
 import android.text.style.RelativeSizeSpan
 import android.text.style.StyleSpan
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.InputStream
+import java.nio.file.Files
 
 data class Output(val uri: Uri, val name: String, val mime: String)
 
@@ -61,10 +64,30 @@ object Converter {
     private fun msg(t: Throwable) = if (t is OutOfMemoryError) "File too large for this device" else t.message ?: t.javaClass.simpleName
 
     private fun combine(ctx: Context, srcs: List<Src>, opts: Options): Output {
-        val parts = srcs.map { s ->
-            if (s.fmt == Fmt.PDF) readBytes(ctx.contentResolver, s.uri) else toPdfBytes(ctx, s, opts)
+        val work = Files.createTempDirectory(ctx.cacheDir.toPath(), "merge-").toFile()
+        try {
+            val parts = srcs.mapIndexed { index, source ->
+                File(work, "part-$index.pdf").also { part ->
+                    if (source.fmt == Fmt.PDF) {
+                        val input = ctx.contentResolver.openInputStream(source.uri)
+                            ?: error("Cannot open ${source.name}")
+                        input.use { stream ->
+                            part.outputStream().use { output -> stream.copyTo(output) }
+                        }
+                    } else {
+                        // Only one generated input PDF is materialised at a time.
+                        part.outputStream().use { it.write(toPdfBytes(ctx, source, opts)) }
+                    }
+                }
+            }
+            val merged = File(work, "merged.pdf")
+            PdfOps.mergeFiles(ctx, parts, merged, work)
+            return merged.inputStream().use { input ->
+                saveStream(ctx, "merged.pdf", Fmt.PDF.mime, input)
+            }
+        } finally {
+            work.deleteRecursively()
         }
-        return save(ctx, "merged.pdf", Fmt.PDF.mime, PdfOps.merge(ctx, parts))
     }
 
     fun convert(ctx: Context, s: Src, dst: Fmt, opts: Options): List<Output> {
@@ -145,7 +168,14 @@ object Converter {
 
     /** Render an image, text, Markdown or DOCX source to PDF bytes. */
     private fun toPdfBytes(ctx: Context, s: Src, opts: Options): ByteArray = when {
-        s.fmt.isImage -> imageToPdf(decodeImage(ctx.contentResolver, s.uri), opts)
+        s.fmt.isImage -> {
+            val bitmap = decodeImage(ctx.contentResolver, s.uri)
+            try {
+                imageToPdf(bitmap, opts)
+            } finally {
+                bitmap.recycle()
+            }
+        }
         s.fmt.isTextLike -> textToPdf(loadLines(ctx, s), opts)
         else -> error("Cannot convert ${s.fmt.label} to PDF")
     }
@@ -154,11 +184,17 @@ object Converter {
         val w = opts.pageSize.w
         val h = (w.toFloat() * bmp.height / bmp.width).toInt().coerceAtLeast(1)
         val doc = PdfDocument()
-        val page = doc.startPage(PdfDocument.PageInfo.Builder(w, h, 1).create())
-        page.canvas.drawColor(Color.WHITE)
-        page.canvas.drawBitmap(bmp, null, android.graphics.Rect(0, 0, w, h), null)
-        doc.finishPage(page)
-        return doc.toBytes()
+        try {
+            val page = doc.startPage(PdfDocument.PageInfo.Builder(w, h, 1).create())
+            page.canvas.drawColor(Color.WHITE)
+            page.canvas.drawBitmap(bmp, null, android.graphics.Rect(0, 0, w, h), null)
+            doc.finishPage(page)
+            val out = ByteArrayOutputStream()
+            doc.writeTo(out)
+            return out.toByteArray()
+        } finally {
+            doc.close()
+        }
     }
 
     private fun textToPdf(lines: List<MdLine>, opts: Options): ByteArray {
@@ -237,6 +273,10 @@ object Converter {
     // ---- saving ----
 
     private fun save(ctx: Context, name: String, mime: String, data: ByteArray): Output {
+        return data.inputStream().use { saveStream(ctx, name, mime, it) }
+    }
+
+    private fun saveStream(ctx: Context, name: String, mime: String, input: InputStream): Output {
         val cr = ctx.contentResolver
         val values = ContentValues().apply {
             put(MediaStore.Downloads.DISPLAY_NAME, name)
@@ -246,7 +286,7 @@ object Converter {
         }
         val uri = cr.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: error("Could not create $name")
         try {
-            cr.openOutputStream(uri)?.use { it.write(data) } ?: error("Could not write $name")
+            cr.openOutputStream(uri)?.use { input.copyTo(it) } ?: error("Could not write $name")
             cr.update(uri, ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }, null, null)
         } catch (e: Exception) {
             cr.delete(uri, null, null)
