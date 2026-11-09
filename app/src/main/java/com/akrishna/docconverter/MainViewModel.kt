@@ -67,9 +67,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun convert() {
         if (busy) return
         val to = target ?: return
-        val srcs = sources.toList()
-        if (srcs.isEmpty() || to !in commonTargets(srcs.map { it.fmt })) return
-        val jobOptions = options.copy()
+        val inputs = ConversionInputs(sources, to, options)
+        val srcs = inputs.sources
+        if (srcs.isEmpty() || inputs.target !in commonTargets(srcs.map { it.fmt })) return
         val app = getApplication<Application>()
         busy = true
         progress = "Converting…"
@@ -78,7 +78,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 val r = withContext(Dispatchers.IO) {
-                    Converter.run(app, srcs, to, jobOptions) { i, n ->
+                    Converter.run(app, srcs, inputs.target, inputs.options) { i, n ->
                         progress = if (n > 1) "Converting ${i + 1} of $n…" else "Converting…"
                     }
                 }
