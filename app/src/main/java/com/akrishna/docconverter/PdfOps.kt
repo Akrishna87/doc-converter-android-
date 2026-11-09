@@ -10,6 +10,7 @@ import com.tom_roush.pdfbox.pdmodel.encryption.InvalidPasswordException
 import com.tom_roush.pdfbox.text.PDFTextStripper
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.File
 
 /** PDF operations backed by PdfBox-Android: merge, extract/split pages, text extraction. */
 object PdfOps {
@@ -57,6 +58,16 @@ object PdfOps {
             dst.save(out)
         }
         return out.toByteArray()
+    }
+
+    fun mergeFiles(ctx: Context, parts: List<File>, destination: File, scratchDir: File) {
+        init(ctx)
+        val merger = PDFMergerUtility()
+        parts.forEach { merger.addSource(it) }
+        merger.destinationFileName = destination.absolutePath
+        val memory = MemoryUsageSetting.setupTempFileOnly()
+        memory.setTempDir(scratchDir)
+        merger.mergeDocuments(memory)
     }
 
     fun merge(ctx: Context, parts: List<ByteArray>): ByteArray {
