@@ -234,7 +234,7 @@ private fun share(ctx: Context, outs: List<Output>) {
         Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_STREAM, outs[0].uri).setType(outs[0].mime)
     } else {
         Intent(Intent.ACTION_SEND_MULTIPLE)
-            .putParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM, ArrayList(outs.map { it.uri }))
+            .putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(outs.map { it.uri }))
             .setType("*/*")
     }.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     ctx.startActivity(Intent.createChooser(i, "Share"))
