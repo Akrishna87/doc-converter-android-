@@ -6,33 +6,36 @@ plugins {
 android {
     namespace = "com.akrishna.docconverter"
     compileSdk = 34
-
     defaultConfig {
         applicationId = "com.akrishna.docmorph"
         minSdk = 29
         targetSdk = 34
-        versionCode = 4
-        versionName = "1.1.0"
+        versionCode = providers.gradleProperty("docmorphVersionCode").orElse("5").get().toInt().also {
+            require(it in 5..2100000000) { "Invalid DocMorph version code" }
+        }
+        versionName = "1.1.1"
     }
 
-    // Release signing comes from the environment (e.g. GitHub secrets); no key is stored in the repo.
-    // Without it the release build falls back to the debug signature, which installs fine but
-    // cannot update an APK signed by a different machine's debug key.
-    val releaseKey = System.getenv("KEYSTORE_FILE")
-    if (releaseKey != null) {
+    // No debug-key fallback. Without credentials CI builds an unsigned release.
+    // Distribution workflows must require credentials and verify the signed APK.
+    val signingNames = listOf("KEYSTORE_FILE", "KEYSTORE_PASSWORD", "KEY_ALIAS", "KEY_PASSWORD")
+    val signingValues = signingNames.associateWith { System.getenv(it) }
+    val signingPresent = signingValues.values.any { !it.isNullOrBlank() }
+    if (signingPresent) {
+        require(signingValues.values.all { !it.isNullOrBlank() }) { "Incomplete release signing environment" }
+        require(file(signingValues.getValue("KEYSTORE_FILE")!!).isFile) { "Release keystore missing" }
         signingConfigs {
             create("release") {
-                storeFile = file(releaseKey)
-                storePassword = System.getenv("KEYSTORE_PASSWORD")
-                keyAlias = System.getenv("KEY_ALIAS")
-                keyPassword = System.getenv("KEY_PASSWORD")
+                storeFile = file(signingValues.getValue("KEYSTORE_FILE")!!)
+                storePassword = signingValues.getValue("KEYSTORE_PASSWORD")
+                keyAlias = signingValues.getValue("KEY_ALIAS")
+                keyPassword = signingValues.getValue("KEY_PASSWORD")
             }
         }
     }
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName(if (releaseKey != null) "release" else "debug")
-            // R8 is off: shrinking PdfBox without device testing risks runtime crashes.
+            if (signingPresent) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
         }
     }
@@ -55,6 +58,5 @@ dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
-
     testImplementation("junit:junit:4.13.2")
 }
