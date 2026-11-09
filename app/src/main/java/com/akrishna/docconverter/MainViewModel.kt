@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -25,8 +26,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val anyTextLike: Boolean get() = sources.any { it.fmt.isTextLike }
     val anyPdf: Boolean get() = sources.any { it.fmt == Fmt.PDF }
 
-    /** Add files to the batch ([append] = true) or start a new batch. */
+    /** Ignore incoming picker/share results while a conversion owns the selection. */
     fun setFiles(uris: List<Uri>, append: Boolean) {
+        if (busy) return
         val cr = getApplication<Application>().contentResolver
         val list = if (append) sources.toMutableList() else mutableListOf()
         val skipped = mutableListOf<String>()
@@ -43,36 +45,53 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun remove(src: Src) {
+        if (busy) return
         sources = sources - src
         results = emptyList()
         if (target !in targets) target = targets.firstOrNull()
     }
 
     fun clear() {
+        if (busy) return
         sources = emptyList(); target = null; results = emptyList(); error = null
     }
 
-    fun selectTarget(f: Fmt) { target = f }
+    fun selectTarget(f: Fmt) {
+        if (!busy && f in targets) target = f
+    }
 
-    fun update(f: (Options) -> Options) { options = f(options) }
+    fun update(f: (Options) -> Options) {
+        if (!busy) options = f(options)
+    }
 
     fun convert() {
+        if (busy) return
         val to = target ?: return
-        val srcs = sources
-        if (srcs.isEmpty()) return
+        val srcs = sources.toList()
+        if (srcs.isEmpty() || to !in commonTargets(srcs.map { it.fmt })) return
+        val jobOptions = options.copy()
+        val app = getApplication<Application>()
         busy = true
+        progress = "Converting…"
         error = null
         results = emptyList()
         viewModelScope.launch {
-            val r = withContext(Dispatchers.IO) {
-                Converter.run(getApplication(), srcs, to, options) { i, n ->
-                    progress = if (n > 1) "Converting ${i + 1} of $n…" else "Converting…"
+            try {
+                val r = withContext(Dispatchers.IO) {
+                    Converter.run(app, srcs, to, jobOptions) { i, n ->
+                        progress = if (n > 1) "Converting ${i + 1} of $n…" else "Converting…"
+                    }
                 }
+                results = r.outputs
+                error = r.errors.takeIf { it.isNotEmpty() }?.joinToString("\n")
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                error = "Conversion failed: ${failure.message ?: failure.javaClass.simpleName}"
+            } finally {
+                progress = ""
+                busy = false
             }
-            results = r.outputs
-            error = r.errors.takeIf { it.isNotEmpty() }?.joinToString("\n")
-            progress = ""
-            busy = false
         }
     }
 }
