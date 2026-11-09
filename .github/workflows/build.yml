@@ -5,24 +5,89 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      signed:
+        description: Build a signed release test APK (trusted branch only; no publication)
+        type: boolean
+        default: false
+      version_code:
+        description: Version code for signed test APK (use 5 then 6 for update test)
+        type: string
+        default: '5'
+
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
+      - name: Unit tests and unsigned compilation checks
+        run: ./gradlew testDebugUnitTest assembleDebug assembleRelease
+      - name: Upload debug APK only (not a stable-update release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: DocMorph-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+  signed-test:
+    if: >-
+      github.event_name == 'workflow_dispatch' && inputs.signed &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/dm-031-stable-signing')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-disabled: true
       - name: Unit tests
         run: ./gradlew testDebugUnitTest
-      - name: Build debug and release APKs
-        run: ./gradlew assembleDebug assembleRelease
-      - uses: actions/upload-artifact@v4
+      - name: Build signed test APK
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          VERSION_CODE: ${{ inputs.version_code }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then echo "::error::Missing signing secret: $name"; exit 1; fi
+          done
+          [[ "$VERSION_CODE" =~ ^[0-9]+$ ]] || { echo '::error::Version code must be numeric'; exit 1; }
+          umask 077
+          export KEYSTORE_FILE="$RUNNER_TEMP/docmorph-release.jks"
+          trap 'rm -f "$KEYSTORE_FILE"' EXIT
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_FILE"
+          ./gradlew --no-daemon assembleRelease -PdocmorphVersionCode="$VERSION_CODE"
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)
+          test -n "$APKSIGNER"
+          mkdir -p signed-output
+          "$APKSIGNER" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk | tee signed-output/certificate.txt
+          cp app/build/outputs/apk/release/app-release.apk "signed-output/DocMorph-signed-vc${VERSION_CODE}.apk"
+      - name: Upload verified signed APK (no GitHub release)
+        uses: actions/upload-artifact@v4
         with:
-          name: DocMorph-apks
-          path: |
-            app/build/outputs/apk/debug/app-debug.apk
-            app/build/outputs/apk/release/app-release.apk
+          name: DocMorph-signed-vc${{ inputs.version_code }}
+          path: signed-output/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Remove temporary keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/docmorph-release.jks"
