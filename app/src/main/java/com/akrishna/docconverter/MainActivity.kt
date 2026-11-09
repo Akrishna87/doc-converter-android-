@@ -93,6 +93,7 @@ private fun Screen(vm: MainViewModel) {
     val append = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { vm.setFiles(it, true) }
     val target = vm.target
     val opts = vm.options
+    val editable = !vm.busy
 
     Scaffold { pad ->
         Column(
@@ -104,13 +105,16 @@ private fun Screen(vm: MainViewModel) {
                 "Convert images, PDF, Word, text and Markdown on your device. Nothing is uploaded.",
                 style = MaterialTheme.typography.bodyMedium,
             )
+            if (vm.busy) {
+                Text("Files and settings are locked during conversion. To add or share more files, wait until it finishes and select or share them again.", style = MaterialTheme.typography.bodySmall)
+            }
 
             if (vm.sources.isEmpty()) {
-                Button(onClick = { replace.launch(PICK_TYPES) }, modifier = Modifier.fillMaxWidth()) { Text("Choose files") }
+                Button(onClick = { replace.launch(PICK_TYPES) }, enabled = editable, modifier = Modifier.fillMaxWidth()) { Text("Choose files") }
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { append.launch(PICK_TYPES) }) { Text("Add more") }
-                    TextButton(onClick = vm::clear) { Text("Clear") }
+                    OutlinedButton(onClick = { append.launch(PICK_TYPES) }, enabled = editable) { Text("Add more") }
+                    TextButton(onClick = vm::clear, enabled = editable) { Text("Clear") }
                 }
                 vm.sources.forEach { s ->
                     Card(Modifier.fillMaxWidth()) {
@@ -119,7 +123,7 @@ private fun Screen(vm: MainViewModel) {
                                 Text(s.name, style = MaterialTheme.typography.bodyMedium)
                                 Text(s.fmt.label, style = MaterialTheme.typography.bodySmall)
                             }
-                            TextButton(onClick = { vm.remove(s) }) { Text("Remove") }
+                            TextButton(onClick = { vm.remove(s) }, enabled = editable) { Text("Remove") }
                         }
                     }
                 }
@@ -133,15 +137,15 @@ private fun Screen(vm: MainViewModel) {
                 Text("Convert to", style = MaterialTheme.typography.titleSmall)
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     vm.targets.forEach { f ->
-                        FilterChip(selected = target == f, onClick = { vm.selectTarget(f) }, label = { Text(chipLabel(f, vm.allPdf)) })
+                        FilterChip(selected = target == f, enabled = editable, onClick = { vm.selectTarget(f) }, label = { Text(chipLabel(f, vm.allPdf)) })
                     }
                 }
 
-                // ---- options relevant to the current selection ----
                 if (target == Fmt.JPG || target == Fmt.WEBP) {
                     Text("Image quality: ${opts.imageQuality}%", style = MaterialTheme.typography.titleSmall)
                     Slider(
                         value = opts.imageQuality.toFloat(),
+                        enabled = editable,
                         onValueChange = { v -> vm.update { it.copy(imageQuality = v.toInt()) } },
                         valueRange = 50f..100f,
                     )
@@ -150,7 +154,7 @@ private fun Screen(vm: MainViewModel) {
                     Text("PDF page resolution", style = MaterialTheme.typography.titleSmall)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf(1f, 2f, 3f).forEach { sc ->
-                            FilterChip(selected = opts.pdfScale == sc, onClick = { vm.update { it.copy(pdfScale = sc) } }, label = { Text("${sc.toInt()}x") })
+                            FilterChip(selected = opts.pdfScale == sc, enabled = editable, onClick = { vm.update { it.copy(pdfScale = sc) } }, label = { Text("${sc.toInt()}x") })
                         }
                     }
                 }
@@ -158,37 +162,39 @@ private fun Screen(vm: MainViewModel) {
                     Text("Page size", style = MaterialTheme.typography.titleSmall)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         PageSize.entries.forEach { ps ->
-                            FilterChip(selected = opts.pageSize == ps, onClick = { vm.update { it.copy(pageSize = ps) } }, label = { Text(ps.label) })
+                            FilterChip(selected = opts.pageSize == ps, enabled = editable, onClick = { vm.update { it.copy(pageSize = ps) } }, label = { Text(ps.label) })
                         }
                     }
                     Text("Font size: ${opts.fontSize.toInt()} pt", style = MaterialTheme.typography.titleSmall)
                     Slider(
                         value = opts.fontSize,
+                        enabled = editable,
                         onValueChange = { v -> vm.update { it.copy(fontSize = Math.round(v).toFloat()) } },
                         valueRange = 8f..18f,
                     )
                 }
                 if (target == Fmt.PDF && vm.sources.size > 1) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = opts.combine, onCheckedChange = { c -> vm.update { it.copy(combine = c) } })
+                        Checkbox(checked = opts.combine, enabled = editable, onCheckedChange = { c -> vm.update { it.copy(combine = c) } })
                         Text("Combine all files into one PDF")
                     }
                 }
                 if (target == Fmt.PDF && vm.allPdf && !opts.combine) {
                     OutlinedTextField(
                         value = opts.pageRange,
+                        enabled = editable,
                         onValueChange = { v -> vm.update { it.copy(pageRange = v) } },
                         label = { Text("Pages to keep (e.g. 1-3,5,8-)") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = opts.splitEach, onCheckedChange = { c -> vm.update { it.copy(splitEach = c) } })
+                        Checkbox(checked = opts.splitEach, enabled = editable, onCheckedChange = { c -> vm.update { it.copy(splitEach = c) } })
                         Text("Split into one file per page")
                     }
                 }
 
-                Button(onClick = vm::convert, enabled = !vm.busy && target != null, modifier = Modifier.fillMaxWidth()) {
+                Button(onClick = vm::convert, enabled = editable && target != null, modifier = Modifier.fillMaxWidth()) {
                     if (vm.busy) {
                         CircularProgressIndicator(Modifier.height(20.dp), strokeWidth = 2.dp)
                     } else {
